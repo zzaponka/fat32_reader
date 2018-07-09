@@ -15,7 +15,7 @@
 #define ATTR_VOLUME_ID	0x08
 #define ATTR_DIRECTORY	0x10
 #define ATTR_ARCHIVE	0x20
-#define ATTR_LONG_NAME	( ATTR_READ_ONLY | ATTR_HIDDEN | ATTR_SYSTEM | ATTR_VOLUME_ID )
+#define ATTR_LONG_NAME	( ATTR_READ_ONLY & ATTR_HIDDEN & ATTR_SYSTEM & ATTR_VOLUME_ID )
 
 typedef struct boot_entry { 
 	//'__packed__' attribute ignored for field of type 'uint8_t'
@@ -68,6 +68,8 @@ typedef struct dir_entry {
 int bytes_per_sec;	//bytes per sector
 
 int read_sec(FILE *fd, int sec, int num, uint8_t *buf);
+
+char *int2bin(int a, char *buffer, int buf_size);
 
 int main(int argc, char **argv)
 {
@@ -167,13 +169,16 @@ int main(int argc, char **argv)
 	assert((FATSz * boot_entry.BPB_NumFATs * boot_entry.BPB_BytsPerSec) < MAX_BUF);
 	read_sec(fd, root_dir_sec_num, sec_per_cluster, buf);
 
-	printf("sizeof(struct dir_entry): %lu.\n", sizeof(struct dir_entry));
-	printf("sizeof(t_dir_entry): %lu.\n", sizeof(t_dir_entry));
 	//reading clusters sequentally
-	// for (i = 0; i < (FATSz * boot_entry.BPB_NumFATs * boot_entry.BPB_BytsPerSec) / 32; i++) {
-	for (i = 0; i < 32; i++) {
-		printf("--------------------------------------------------\n");
+	// for (i = 0; i < 32; i++) {
+    // i = 0;
+	for (i = 0; i < (FATSz * boot_entry.BPB_NumFATs * boot_entry.BPB_BytsPerSec) / 32; i++) {
+        char i2b[8];
+	// do {
 		memcpy(&dir_entry, buf + i * sizeof(t_dir_entry), sizeof(t_dir_entry));
+        if (dir_entry.DIR_Name[0] == 0x00)
+            break;
+		printf("--------------------------------------------------\n");
 		printf("> Entry #%d\n", i);
 		printf("dir_entry.DIR_FileSize: %u.\n", dir_entry.DIR_FileSize);
 		printf("dir_entry.DIR_FstClusHI: %u.\n", dir_entry.DIR_FstClusHI);
@@ -182,6 +187,12 @@ int main(int argc, char **argv)
 		p = (uint8_t *)&dir_entry.DIR_WrtDate;
 		printf("dir_entry.DIR_WrtDate: 0x%02x, 0x%02x.\n", *p, *(p + 1));
 		printf("dir_entry.DIR_WrtDate: 0x%04x.\n", dir_entry.DIR_WrtDate);
+		// printf("dir_entry.DIR_Attr: |%s|.\n", int2bin(dir_entry.DIR_Attr, i2b, 8));
+		int2bin(dir_entry.DIR_Attr, i2b, 8);
+		printf("dir_entry.DIR_Attr: |%s|.\n", i2b);
+		if (dir_entry.DIR_Attr == ATTR_VOLUME_ID) {
+			printf("ATTR_VOLUME_ID is set, it seems that it's a Volume ID itself...\n");
+		}
 		if (dir_entry.DIR_Attr & ATTR_VOLUME_ID) {
 			printf("ATTR_VOLUME_ID is set.\n");
 		}
@@ -204,7 +215,9 @@ int main(int argc, char **argv)
 			printf("ATTR_LONG_NAME bit is set.\n");
 		}
 		printf("%d: filename: %s, first char: %c.\n", i, dir_entry.DIR_Name, dir_entry.DIR_Name[0]);
+        // i++;
 	}
+	// } while (dir_entry.DIR_Name[0] != 0x00);
 	fclose(fd);
 
 	return 0;
@@ -231,4 +244,17 @@ int read_sec(FILE *fd, int sec, int num, uint8_t *buf)
 	}
 
 	return len;
+}
+
+char *int2bin(int a, char *buffer, int buf_size)
+{
+    int i;
+	buffer += (buf_size - 1);
+
+	for (i = 7; i >= 0; i--) {
+		*buffer-- = (a & 1) + '0';
+		a >>= 1;
+	}
+
+	return buffer;
 }
