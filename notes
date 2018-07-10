@@ -1,0 +1,94 @@
+FAT Data Structure
+------------------
+
+The first data cluster is cluster 2, computed like this:
+
+RootDirSectors = ((BPB_RootEntCnt * 32) + (BPB_BytsPerSec - 1)) / BPB_BytsPerSec
+
+On FAT32 volume BPB_RootEntCnt is always 0, so RootDirSectors is always 0 too
+
+First data sector (first sector of cluster 2):
+
+FATSz = BPB_FATSz32
+
+FirstDataSector = BPB_ResvdSecCnt + (BPB_NumFATs * FATSz) + RootDirSectors
+                  32              + (2           * 1022)  + 0 = 32 + 2044 + 0 = 2076
+
+Given any valid data cluster number N, the sector number of the first sector of
+that cluster (again relative to sector 0 of the FAT volume) is computed as
+follows:
+
+FirstSectorofCluster = ((N - 2) * BPB_SecPerClus) + FirstDataSector
+
+FAT Type Determination
+----------------------
+First, we determine the count of sectors occupied by the root directory as
+noted earlier:
+
+RootDirSectors = ((BPB_RootEntCnt * 32) + (BPB_BytsPerSec - 1)) / BPB_BytsPerSec
+
+Again: on FAT32 volume BPB_RootEntCnt is always 0, so RootDirSectors is always 0 too
+
+Next, we determine the count of sectors in the data region of the volume:
+
+FATSz = BPB_FATSz32
+TotSec = BPB_TotSec32
+
+DataSec = TotSec - (BPB_ResvdSecCnt + (BPB_NumFATs * FATSz) + RootDirSectors)
+
+Now, we determine the count of clusters (this computation rounds down):
+
+CountOfClusters = DataSec / BPB_SecPerClus
+
+if (CountofClusters < 4085) {
+	/* Volume is FAT12 */
+} else if (CountofClusters < 65525) {
+	/* Volume is FAT16 */
+} else {
+	/* Volume is FAT32 */
+}
+
+FAT Entry Calculation From Cluster N
+------------------------------------
+FATSz = BPB_FATSz32
+FATOffset = N * 4
+
+ThisFATSecNum = BPB_ResvdSecCnt + (FATOffset / BPB_BytsPerSec)
+ThisFATEntOffset = FATOffset % BPB_BytsPerSec
+
+ThisFATSecNum is for 1st FAT. To get the same for the 2nd FAT, add FATSz to it;
+for 3rd, add FATSz * 2 and so on
+
+Reading FAT entry itself:
+FAT32ClusEntryVal = (*((uint32_t *)&SecBuf[ThisFATEntOffset])) & 0x0FFFFFFF
+
+The way the data of a file is associated with the file is as follows. In the
+directory entry, the cluster number of the first cluster of the file is
+recorded. The first cluster (extent) of the file is the data associated with
+this first cluster number, and the location of that data on the volume is
+computed from the cluster number as described earlier (computation of
+FirstSectorofCluster).
+
+Note that a zero-length file—a file that has no data allocated to it—has a
+first cluster number of 0 placed in its directory entry. This cluster location
+in the FAT (see earlier computation of ThisFATSecNum and ThisFATEntOffset)
+contains either an EOC mark (End Of Clusterchain) or the cluster number of the
+next cluster of the file. The EOC value is FAT type dependant (assume
+FATContent is the contents of the cluster entry in the FAT being checked to see
+whether it is an EOC mark):
+
+if (FATContent >= 0x0FFFFFF8)
+	IsEOF = TRUE;
+
+FAT Directory Structure
+-----------------------
+
+For FAT32, the root directory can be of variable size and is a cluster chain,
+just like any other directory is. The first cluster of the root directory on a
+FAT32 volume is stored in BPB_RootClus. Unlike other directories, the root
+directory itself on any FAT type does not have any date or time stamps, does
+not have a file name (other than the implied file name “\”), and does not
+contain “.” and “..” files as the first two directory entries in the directory.
+The only other special aspect of the root directory is that it is the only
+directory on the FAT volume for which it is valid to have a file that has only
+the ATTR_VOLUME_ID attribute bit set (see below).

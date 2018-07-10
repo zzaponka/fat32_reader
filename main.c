@@ -6,64 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define SECT_SIZE 512
-#define MAX_BUF 1048576
-
-#define ATTR_READ_ONLY	0x01
-#define ATTR_HIDDEN	0x02
-#define ATTR_SYSTEM	0x04
-#define ATTR_VOLUME_ID	0x08
-#define ATTR_DIRECTORY	0x10
-#define ATTR_ARCHIVE	0x20
-#define ATTR_LONG_NAME	( ATTR_READ_ONLY & ATTR_HIDDEN & ATTR_SYSTEM & ATTR_VOLUME_ID )
-
-typedef struct boot_entry { 
-	//'__packed__' attribute ignored for field of type 'uint8_t'
-	uint8_t BS_jmpBoot[3]; 
-	uint8_t BS_OEMName[8]; 
-	uint16_t BPB_BytsPerSec __attribute__ ((__packed__)); 
-	uint8_t BPB_SecPerClus; 
-	uint16_t BPB_RsvdSecCnt __attribute__ ((__packed__)); 
-	uint8_t BPB_NumFATs; 
-	uint16_t BPB_RootEntCnt __attribute__ ((__packed__)); 
-	uint16_t BPB_TotSec16 __attribute__ ((__packed__)); 
-	uint8_t BPB_Media; 
-	uint16_t BPB_FATSz16 __attribute__ ((__packed__)); 
-	uint16_t BPB_SecPerTrk __attribute__ ((__packed__)); 
-	uint16_t BPB_NumHeads __attribute__ ((__packed__)); 
-	uint32_t BPB_HiddSec __attribute__ ((__packed__)); 
-	uint32_t BPB_TotSec32 __attribute__ ((__packed__));
-	// assume that partition is FAT32, not FAT12 or FAT16,
-	// so consequent fields are corresponding to this:
-	uint32_t BPB_FATSz32 __attribute__ ((__packed__));
-	uint16_t BPB_ExtFlags __attribute__ ((__packed__));
-	uint16_t BPB_FSVer __attribute__ ((__packed__));
-	uint32_t BPB_RootClus __attribute__ ((__packed__));
-	uint16_t BPB_FSInfo __attribute__ ((__packed__));
-	uint16_t BPB_BkBootSec __attribute__ ((__packed__));
-	uint8_t BPB_Reserved[12];
-	uint8_t BS_DrvNum;
-	uint8_t BS_Reserved1;
-	uint8_t BS_BootSig;
-	uint32_t BS_VolID __attribute__ ((__packed__));
-	uint8_t BS_VolLab[11];
-	uint8_t BS_FilSysType[8];
-} t_boot_entry;
-
-typedef struct dir_entry {
-	uint8_t DIR_Name[11];
-	uint8_t DIR_Attr;
-	uint8_t DIR_NTRes;
-	uint8_t DIR_CrtTimeTenth;
-	uint16_t DIR_CrtTime __attribute__((packed));
-	uint16_t DIR_CrtDate __attribute__((packed));
-	uint16_t DIR_LstAccDate __attribute__((packed));
-	uint16_t DIR_FstClusHI __attribute__((packed));
-	uint16_t DIR_WrtTime __attribute__((packed));
-	uint16_t DIR_WrtDate __attribute__((packed));
-	uint16_t DIR_FstClusLO __attribute__((packed));
-	uint32_t DIR_FileSize __attribute__((packed));
-} t_dir_entry;
+#include "fat32.h"
 
 int bytes_per_sec;	//bytes per sector
 
@@ -91,6 +34,7 @@ int main(int argc, char **argv)
 	// int this_fat_ent_offset;
 	// uint32_t fat32_cluster_entry_val;
 	t_dir_entry dir_entry;
+	t_long_dir_entry long_dir_entry;
 
 	fd = fopen("./disk.img", "r");
 	if (!fd) {
@@ -158,6 +102,7 @@ int main(int argc, char **argv)
 	//determine root directory sector number:
 	printf("Revelation: boot_entry.BPB_RootClus: %u!\n", boot_entry.BPB_RootClus);
 	root_dir_sec_num = first_data_sec + (boot_entry.BPB_RootClus - 2) * sec_per_cluster;
+	printf("And root_dir_sec_num is %ld.\n", root_dir_sec_num);
 	buf = (unsigned char *)malloc(sizeof(unsigned char) * MAX_BUF);
 	if (!buf) {
 		perror("Memory allocation error");
@@ -167,19 +112,24 @@ int main(int argc, char **argv)
 	printf("We're going to read %ld bytes into the buf...\n", FATSz * boot_entry.BPB_NumFATs * boot_entry.BPB_BytsPerSec);
 	printf("And MAX_BUF is: %d.\n", MAX_BUF);
 	assert((FATSz * boot_entry.BPB_NumFATs * boot_entry.BPB_BytsPerSec) < MAX_BUF);
-	read_sec(fd, root_dir_sec_num, sec_per_cluster, buf);
+	// read_sec(fd, root_dir_sec_num, sec_per_cluster, buf);
+	read_sec(fd, root_dir_sec_num, FATSz * boot_entry.BPB_NumFATs * boot_entry.BPB_BytsPerSec, buf);
+	printf("%s@%d: #0\n", __func__, __LINE__);
 
 	//reading clusters sequentally
-	// for (i = 0; i < 32; i++) {
-    // i = 0;
 	for (i = 0; i < (FATSz * boot_entry.BPB_NumFATs * boot_entry.BPB_BytsPerSec) / 32; i++) {
-        char i2b[8];
-	// do {
+		uint8_t *dir_entry_p;
+		char i2b[9];
 		memcpy(&dir_entry, buf + i * sizeof(t_dir_entry), sizeof(t_dir_entry));
-        if (dir_entry.DIR_Name[0] == 0x00)
-            break;
+		if (dir_entry.DIR_Name[0] == 0x00) {
+			// printf("%s@%d: #1: alas, we have missed!\n", __func__, __LINE__);
+			break;
+		}
 		printf("--------------------------------------------------\n");
-		printf("> Entry #%d\n", i);
+		// printf("> Entry #%d, hex: 0x%08X.\n", i, (uint32_t )dir_entry);
+		printf("> Entry #%d.\n", i);
+		dir_entry_p = buf + i * sizeof(t_dir_entry);
+		printf("As hex: 0x%08X.\n", (unsigned int )*dir_entry_p);
 		printf("dir_entry.DIR_FileSize: %u.\n", dir_entry.DIR_FileSize);
 		printf("dir_entry.DIR_FstClusHI: %u.\n", dir_entry.DIR_FstClusHI);
 		printf("dir_entry.DIR_FstClusLO: %u.\n", dir_entry.DIR_FstClusLO);
@@ -187,11 +137,79 @@ int main(int argc, char **argv)
 		p = (uint8_t *)&dir_entry.DIR_WrtDate;
 		printf("dir_entry.DIR_WrtDate: 0x%02x, 0x%02x.\n", *p, *(p + 1));
 		printf("dir_entry.DIR_WrtDate: 0x%04x.\n", dir_entry.DIR_WrtDate);
-		// printf("dir_entry.DIR_Attr: |%s|.\n", int2bin(dir_entry.DIR_Attr, i2b, 8));
+		i2b[8] = '\0';
 		int2bin(dir_entry.DIR_Attr, i2b, 8);
 		printf("dir_entry.DIR_Attr: |%s|.\n", i2b);
 		if (dir_entry.DIR_Attr == ATTR_VOLUME_ID) {
-			printf("ATTR_VOLUME_ID is set, it seems that it's a Volume ID itself...\n");
+			printf("Only ATTR_VOLUME_ID is set, skipping...\n");
+			continue;
+		}
+		if (dir_entry.DIR_Attr == ATTR_LONG_NAME) {
+			// TODO:
+			// in order to find FAT entry for given cluster
+			// number N (which is contained inside DIR_FstClusHI
+			// and DIR_FstClusLO) we need:
+			// - calculate:
+			// FATOffset = N * 4
+			// ThisFATSecNum = BPB_RsvdSecCnt + (FATOffset / BPB_BytsPerSec)
+			// ThisFATEntOffset FATOffset % BPB_BytsPerSec
+			// - pass these values to list_dir() recursively
+			int j;
+
+			// i++; // skipping
+			printf("ATTR_LONG_NAME bit is set, have to do something with that....\n");
+			memcpy(&long_dir_entry, buf + i * sizeof(t_long_dir_entry), sizeof(t_long_dir_entry));
+			printf("long_dir_entry.LDIR_Ord: 0x%01X.\n", long_dir_entry.LDIR_Ord);
+			printf("long_dir_entry.LDIR_Name1 (in hex): ");
+			for (j = 0; j < 10; j++) {
+				if (long_dir_entry.LDIR_Name1[j] == 0xFF)
+					break;
+				printf("%02X", long_dir_entry.LDIR_Name1[j]);
+			}
+			printf("\n");
+			printf("long_dir_entry.LDIR_Name1 (as chars): |");
+			for (j = 0; j < 10; j++) {
+				if (long_dir_entry.LDIR_Name1[j] == 0xFF)
+					break;
+				printf("%lc", long_dir_entry.LDIR_Name1[j]);
+			}
+			printf("|\n");
+			i2b[8] = '\0';
+			int2bin(long_dir_entry.LDIR_Attr, i2b, 8);
+			printf("long_dir_entry.LDIR_Attr: |%s|.\n", i2b);
+			printf("long_dir_entry.LDIR_Type: 0x%01X.\n", long_dir_entry.LDIR_Type);
+			printf("long_dir_entry.LDIR_Chksum: 0x%01X.\n", long_dir_entry.LDIR_Chksum);
+			// printf("long_dir_entry.LDIR_Name2: |%s|.\n", long_dir_entry.LDIR_Name2);
+			printf("long_dir_entry.LDIR_Name2 (in hex): ");
+			for (j = 0; j < 10; j++) {
+				if (long_dir_entry.LDIR_Name2[j] == 0xFF)
+					break;
+				printf("%02X", long_dir_entry.LDIR_Name2[j]);
+			}
+			printf("\n");
+			printf("long_dir_entry.LDIR_Name2 (as chars): |");
+			for (j = 0; j < 10; j++) {
+				if (long_dir_entry.LDIR_Name2[j] == 0xFF)
+					break;
+				printf("%lc", long_dir_entry.LDIR_Name2[j]);
+			}
+			printf("|\n");
+			printf("long_dir_entry.LDIR_FstClusLO: 0x%02X.\n", long_dir_entry.LDIR_FstClusLO);
+			// printf("long_dir_entry.LDIR_Name3: |%s|.\n", long_dir_entry.LDIR_Name3);
+			printf("long_dir_entry.LDIR_Name3 (in hex): ");
+			for (j = 0; j < 10; j++) {
+				if (long_dir_entry.LDIR_Name3[j] == 0xFF)
+					break;
+				printf("%02X", long_dir_entry.LDIR_Name3[j]);
+			}
+			printf("\n");
+			printf("long_dir_entry.LDIR_Name3 (as chars): |");
+			for (j = 0; j < 10; j++) {
+				if (long_dir_entry.LDIR_Name3[j] == 0xFF)
+					break;
+				printf("%lc", long_dir_entry.LDIR_Name3[j]);
+			}
+			printf("|\n");
 		}
 		if (dir_entry.DIR_Attr & ATTR_VOLUME_ID) {
 			printf("ATTR_VOLUME_ID is set.\n");
@@ -211,13 +229,9 @@ int main(int argc, char **argv)
 		if (dir_entry.DIR_Attr & ATTR_ARCHIVE) {
 			printf("ATTR_ARCHIVE bit is set.\n");
 		}
-		if (dir_entry.DIR_Attr & ATTR_LONG_NAME) {
-			printf("ATTR_LONG_NAME bit is set.\n");
-		}
 		printf("%d: filename: %s, first char: %c.\n", i, dir_entry.DIR_Name, dir_entry.DIR_Name[0]);
-        // i++;
 	}
-	// } while (dir_entry.DIR_Name[0] != 0x00);
+
 	fclose(fd);
 
 	return 0;
@@ -228,20 +242,27 @@ int read_sec(FILE *fd, int sec, int num, uint8_t *buf)
 	int pos;
 	int len;
 
-	pos = fseek(fd, sec * bytes_per_sec, SEEK_SET);
+	printf("%s@%d: #0\n", __func__, __LINE__);
+	pos = fseek(fd, sec * bytes_per_sec , SEEK_SET);
+	printf("%s@%d: #1\n", __func__, __LINE__);
 	if (pos) {
 		perror("Can't find position inside the file");
 		exit(1);
 	}
+	printf("%s@%d: #2\n", __func__, __LINE__);
+#if 0
 	if (num * bytes_per_sec > MAX_BUF) {
 		perror("Buffer size too small");
 		exit(1);
 	}
-	len = fread(buf, 1, bytes_per_sec * num, fd);
-	if (len != bytes_per_sec * num) {
+#endif
+	len = fread(buf, 1, num, fd);
+	printf("%s@%d: #3\n", __func__, __LINE__);
+	if (len != num) {
 		perror("Error in reading sector\n");
 		exit(1);
 	}
+	printf("%s@%d: #4\n", __func__, __LINE__);
 
 	return len;
 }
