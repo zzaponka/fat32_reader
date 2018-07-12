@@ -133,7 +133,7 @@ void list_long_entry(uint8_t *buf, int size)
 
 void get_filename(uint8_t *buf, uint8_t len)
 {
-	uint8_t i;
+	int8_t i;
 	uint8_t j;
 	uint8_t k;
 	t_long_dir_entry *lde;
@@ -142,7 +142,8 @@ void get_filename(uint8_t *buf, uint8_t len)
 	printf(">>> %s@%d: called.\n", __func__, __LINE__);
 	memset(filename, 0x00, sizeof(filename));
 	j = 0;
-	for (i = 0; i < len; i++) {
+	for (i = (len - 1); i >= 0; i--) {
+		printf(">>> %s@%d: getting filename with len = %d, i = %d.\n", __func__, __LINE__, len, i);
 		lde = (t_long_dir_entry *)(buf + i * sizeof(t_long_dir_entry));
 		printf("sizeof(lde->LDIR_Name1): %ld.\n", sizeof(lde->LDIR_Name1));
 		printf("lde->LDIR_Name1 in hex:\n");
@@ -203,7 +204,8 @@ void list_dir(t_dir_entry *buf, long offset)
 	printf("%s@%d: buf address received: %p.\n", __func__, __LINE__, buf);
 	printf("%s@%d: entry_buf address copied: %p.\n", __func__, __LINE__, entry_buf);
 	i = 0;
-	while (1) {
+	for (i = 0; i < 16; i++) {
+	// while (1) {
 		printf("%s@%d: =======================\n", __func__, __LINE__);
 		printf("%s@%d: Iteration #%d.\n", __func__, __LINE__, i);
 		printf("%s@%d: FAT entry in hex:\n", __func__, __LINE__);
@@ -241,38 +243,45 @@ void list_dir(t_dir_entry *buf, long offset)
 			printf("%s@%d: ATTR_LONG_NAME bit is set, have to do something with that....\n", __func__, __LINE__);
 			lde_p = (t_long_dir_entry *)entry_buf;
 			printf("%s@%d: buf->LDIR_Ord = %X.\n", __func__, __LINE__, lde_p->LDIR_Ord);
-			lde_last_num = lde_p->LDIR_Ord & ~LAST_LONG_ENTRY;
-			printf("%s@%d: lde_last_num = %d.\n", __func__, __LINE__, lde_last_num);
-			list_long_entry((uint8_t *)lde_p, lde_last_num);
-			// skipping short entry
-			// i++;
+			if ((lde_p->LDIR_Ord & LAST_LONG_ENTRY) == LAST_LONG_ENTRY) {
+				printf(">>> %s@%d: ATTN! Last member of the long name entry sequence! <<<\n", __func__, __LINE__);
+				lde_last_num = lde_p->LDIR_Ord & ~LAST_LONG_ENTRY;
+				printf("%s@%d: lde_last_num = %d.\n", __func__, __LINE__, lde_last_num);
+				list_long_entry((uint8_t *)lde_p, lde_last_num);
+			} else {
+				printf(">>> %s@%d: Okay, it's not last member of the long name entry sequence, skipping...<<<\n", __func__, __LINE__);
+			}
 		}
 		if (entry_buf->DIR_Attr == ATTR_DIRECTORY) {
 			// TODO: move offset calculation to separate function
 			printf("ATTR_DIRECTORY bit is set, have to pass the entry to directory listing fn().\n");
 			uint8_t *sec_val;
-			uint32_t fat_offset;
+			// uint32_t fat_offset;
 			// uint32_t this_fat_sec_num;
-			uint32_t this_fat_end_offset;
+			// uint32_t this_fat_end_offset;
 			uint32_t first_sector_of_cluster;
 
 			sec_val = (uint8_t *)malloc(sizeof(uint32_t));
 			memcpy(sec_val, &entry_buf->DIR_FstClusLO, sizeof(uint16_t));
 			memcpy(sec_val + 2, &entry_buf->DIR_FstClusHI, sizeof(uint16_t));
-			fat_offset = (*sec_val) * 4;
-			printf("%s@%d: Finally, fat_offset: %d.\n", __func__, __LINE__, fat_offset);
+			// fat_offset = (*sec_val) * 4;
+			printf("%s@%d: Finally, sec_val: %d (0x%x).\n", __func__, __LINE__, *(uint32_t *)sec_val, *(uint32_t *)sec_val);
 			// this_fat_sec_num = boot_entry.BPB_RsvdSecCnt + (fat_offset / boot_entry.BPB_BytsPerSec);
 			// this_fat_sec_num = root_dir_sec_num + (fat_offset / boot_entry.BPB_BytsPerSec);
-			this_fat_end_offset = fat_offset % boot_entry.BPB_BytsPerSec;
+			// this_fat_end_offset = fat_offset % boot_entry.BPB_BytsPerSec;
 			first_sector_of_cluster = ((*sec_val) - 2) * boot_entry.BPB_SecPerClus;
 			// printf("%s@%d: Finally, this_fat_sec_num: %d.\n", __func__, __LINE__, this_fat_sec_num);
 			printf("%s@%d: Finally, this_fat_end_offset: %d.\n", __func__, __LINE__, this_fat_end_offset); 
 			printf("%s@%d: Finally, first_sector_of_cluster: %d.\n", __func__, __LINE__, first_sector_of_cluster);
 			printf("%s@%d: buf address, passed to list_dir(): %p.\n", __func__, __LINE__, buf);
-			list_dir(buf, first_sector_of_cluster * 16);
+			// shift the buf pointer by number of sectors
+			// multiplied by 16 32-byte FAT entries per sector and
+			// 2 more 32-byte FAT entries  for "dot" and "dotdot"
+			// directories
+			list_dir(buf, first_sector_of_cluster * 16 + 2);
 		}
-		printf("%s@%d: incrementing i...\n", __func__, __LINE__);
-		i++;
+		// printf("%s@%d: incrementing i...\n", __func__, __LINE__);
+		// i++;
 		printf("%s@%d: shifting buf...\n", __func__, __LINE__);
 		entry_buf++;
 	}
