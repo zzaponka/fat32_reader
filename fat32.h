@@ -2,7 +2,7 @@
 #define __FAT32_H__
 
 #define SECT_SIZE 512
-#define MAX_BUF 1048576
+// #define MAX_BUF 1048576
 #define WCHAR_W 2
 #define LDIR_ENT_FILENAME_LEN 13
 
