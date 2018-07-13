@@ -27,6 +27,18 @@ void list_long_entry(uint8_t *buf, int size);
 
 void list_dir(uint8_t *recv_buf, int offset, int sec, int level);
 
+// TODO:
+// we can't get around reading FAT itself (not data region):
+// - first data sector:
+// first_data_sector = BPB_RsvdSecCnt + (BPB_NumFATs * BPB_FATSz32)
+// - given any valid data cluster number N (first is 2), the sector number of
+// the first sector of that cluster (again relative to the sector 0 of the FAT
+// volume):
+// first_sector_of_cluster = ((N - 2) * BPB_SecPerClus) + first_data_sector
+// - number of data sectors:
+// data_sec = BPB_TotSec32 - (BPB_ResvdSecCnt + (BPB_NumFATs * BPB_FATSz32))
+// - count of clusters = data_sec / BPB_SecPerClus
+
 int main(int argc, char **argv)
 {
 	uint8_t *buf;
