@@ -92,3 +92,31 @@ contain “.” and “..” files as the first two directory entries in the dir
 The only other special aspect of the root directory is that it is the only
 directory on the FAT volume for which it is valid to have a file that has only
 the ATTR_VOLUME_ID attribute bit set (see below).
+
+For that long directory calculations:
+-------------------------------------
+- first entry for 'super text' directory gives us next cluster in the chain as
+  0x4b (75 decimal)
+- second entry for cluster #75 gives us value 0x8c (decimal 140)
+- third entry for cluster #140 gives us value 0xcd (decimal 205)
+- fourth entry for cluster #205 gives us value 0x10e (decimal 270)
+- 5th enrty for cluster #270 gives us value 0x14f (decimal 335)
+- 6th entry for cluster #335 gives us value 0x190 (decimal 400)
+- 7th entry for cluster #400 gives us value 0x1d1 (decimal 465)
+- 8th entry for cluster #465 gives us value 0x212 (decimal 530)
+- 9th entry for cluster #530 gives us value 0x253 (decimal 595)
+- 10th entry for cluster #595 gives us value 0x294 (decimal 660)
+- 11th entry for cluster #660 gives us value 0x2d5 (decimal 725)
+- 12th entry for cluster #725 gives us value 0x316 (decimal 790)
+- 13th entry for cluster #790 gives us value 0x357 (decimal 855)
+- 14th entry for cluster #855 gives us value 0x398 (decimal 920)
+- 15th entry for cluster #920 gives us value 0x3d9 (decimal 985)
+- 16th entry for cluster #985 gives us value 0x41a (decimal 1050)
+- 17th entry for cluster #1050 gives us value 0x45b (decimal 1115)
+- 18th entry for cluster #1115 gives us value 0x0fffffff (this is EOC finally!)
+
+Output layout after restart(!)
+------------------------------
+- log: file5499.txt
+- data: di_dat_cluster_8_2
+- fat: di_fat_1
