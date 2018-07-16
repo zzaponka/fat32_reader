@@ -87,7 +87,7 @@ int read_cluster(FILE *fd, uint8_t *buf, int sec);
 
 void list_dir(uint8_t *recv_buf, int offset, int sec, int level, uint32_t cluster);
 
-void list_long_entry(uint8_t *buf, int size);
+void list_long_entry(uint8_t *buf, int size, int level);
 
 uint32_t get_clus_fat_entry_val(uint32_t *clus_fat_entry_val);
 

@@ -148,7 +148,7 @@ void list_dir(uint8_t *recv_buf, int offset, int sec, int level, uint32_t cluste
 					DEBUG_LOG("Last record of the long name entry sequence.");
 					long_entries_num = lde_p->LDIR_Ord & ~LAST_LONG_ENTRY;
 					DEBUG_LOG("long_entries_num = %d.", long_entries_num);
-					list_long_entry((uint8_t *)lde_p, long_entries_num);
+					list_long_entry((uint8_t *)lde_p, long_entries_num, level);
 				} else {
 					DEBUG_LOG("Not last record of the long name entry sequence.");
 				}
@@ -218,7 +218,7 @@ void list_dir(uint8_t *recv_buf, int offset, int sec, int level, uint32_t cluste
 	free(buf);
 }
 
-void list_long_entry(uint8_t *buf, int size)
+void list_long_entry(uint8_t *buf, int size, int level)
 {
 	int8_t i;
 	uint8_t j;
@@ -264,7 +264,13 @@ void list_long_entry(uint8_t *buf, int size)
 		}
 	}
 
-	printf("%s%d: finally, filename is |%ls|.\n", __func__, __LINE__, (wchar_t *)filename);
+	if (level > 2) {
+		for (i = 0; i < level - 2; i++)
+			printf("\t");
+	}
+	if (level > 1)
+		printf("+-------");
+	printf("%ls\n", (wchar_t *)filename);
 
 	return;
 }
