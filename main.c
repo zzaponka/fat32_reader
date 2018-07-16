@@ -64,7 +64,7 @@ void list_info(t_boot_entry be)
 	printf("boot_entry.BPB_RootEntCnt: %d.\n", boot_entry.BPB_RootEntCnt);
 	printf("boot_entry.BPB_RootClus: %d.\n", boot_entry.BPB_RootClus);
 	printf("boot_entry.BPB_BytsPerSec: %d.\n", boot_entry.BPB_BytsPerSec);
-	printf("boot_entry.BPB_Media: %d (0x%x).\n", boot_entry.BPB_Media, boot_entry.BPB_Media);
+	printf("boot_entry.BPB_Media: %d (0x%x).\n\n", boot_entry.BPB_Media, boot_entry.BPB_Media);
 }
 
 int read_cluster(FILE *fd, uint8_t *buf, int sec)
@@ -89,35 +89,35 @@ void list_dir(uint8_t *recv_buf, int offset, int sec, int level, uint32_t cluste
 	uint8_t *buf;
 	t_dir_entry *de_p;
 	int local_offset = offset;
-	uint32_t local_cluster = cluster;
+	uint32_t local_cluster;
 	int num_entries_to_iterate;
 
 	buf = (uint8_t *)malloc(SECT_SIZE * 8);
 	memcpy(buf, recv_buf, SECT_SIZE * 8);
 
+	DEBUG_LOG("=========================================================");
+	DEBUG_LOG("received cluster: %u (0x%x).", cluster, cluster);
+	local_cluster = cluster;
+	DEBUG_LOG("assigned local cluster: %u.", local_cluster);
 	while (1) {
 		int i;
 
 		// There are 128 FAT entries per 8-sector cluster
 		num_entries_to_iterate = 128 - local_offset;
-		DEBUG_LOG("Iterating till %d.", num_entries_to_iterate);
 		for (i = 0; i < num_entries_to_iterate; i++) {
-
+			DEBUG_LOG("===== Level [%04d] = Iteration [%04d], stop before [%04d] =====", level, i, num_entries_to_iterate);
 			de_p = ((t_dir_entry *)buf) + i + local_offset;
 
-#if 0
+#ifdef DEBUG
 			int j;
 			uint8_t *bufp = buf + (i + local_offset) * 32;
-			DEBUG_LOG("[%04d]=======================", level);
-			DEBUG_LOG("Iteration #%d.", i);
-			DEBUG_LOG("Iterate till i < #%d.", num_entries_to_iterate);
 			DEBUG_LOG("FAT entry in hex:");
 			for (j = 0; j < 32; j++) {
-				DEBUG_LOG("%02X|", bufp[j]);
+				printf("%02X|", bufp[j]);
 				if (!((j + 1) % 8))
-					DEBUG_LOG(" |");
+					printf(" |");
 				if (!((j + 1) % 16))
-					DEBUG_LOG("");
+					printf("\n");
 			}
 #endif
 
@@ -164,7 +164,7 @@ void list_dir(uint8_t *recv_buf, int offset, int sec, int level, uint32_t cluste
 				memset(first_cluster, '\0', sizeof(uint32_t));
 				memcpy(first_cluster, &de_p->DIR_FstClusLO, sizeof(uint16_t));
 				memcpy(first_cluster + 2, &de_p->DIR_FstClusHI, sizeof(uint16_t));
-				DEBUG_LOG("Directory's entry first_cluster: %x.", *(uint32_t *)first_cluster);
+				DEBUG_LOG("Directory's entry first_cluster: %u (0x%x).", *(uint32_t *)first_cluster, *(uint32_t *)first_cluster);
 
 				clus_fat_entry_val = get_clus_fat_entry_val((uint32_t *)first_cluster);
 				DEBUG_LOG("clus_fat_entry_val: %d (0x%x).", clus_fat_entry_val, clus_fat_entry_val);
@@ -181,7 +181,7 @@ void list_dir(uint8_t *recv_buf, int offset, int sec, int level, uint32_t cluste
 
 				buf = (uint8_t *)malloc(bytes_per_sec * 8);
 				read_cluster(fd, buf, first_data_sec + first_sector_of_cluster);
-				list_dir(buf, 2, first_data_sec + first_sector_of_cluster, level + 1, *first_cluster);
+				list_dir(buf, 2, first_data_sec + first_sector_of_cluster, level + 1, *(uint32_t *)first_cluster);
 
 				free(buf);
 				free(first_cluster);
@@ -276,7 +276,7 @@ uint32_t get_clus_fat_entry_val(uint32_t *clus_val)
 	int fat_entry_offset;
 	int clus_fat_entry_val;
 
-	DEBUG_LOG("clus_val received = %x.", *clus_val);
+	DEBUG_LOG("clus_val received = %u (0x%x).", *clus_val, *clus_val);
 
 	buf = (uint8_t *)malloc(SECT_SIZE * 8);
 	memset (buf, '\0', SECT_SIZE);
