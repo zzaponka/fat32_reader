@@ -7,7 +7,7 @@
 #include <wchar.h>
 
 #include "debug.h"
-#include "fat32.h"
+#include "fat32read.h"
 
 int main(int argc, char **argv)
 {
