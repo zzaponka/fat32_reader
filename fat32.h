@@ -74,4 +74,21 @@ typedef struct long_dir_entry {
 	uint8_t LDIR_Name3[4];
 } t_long_dir_entry;
 
+// Global variables
+FILE *fd;
+t_boot_entry boot_entry;
+int bytes_per_sec;
+uint32_t first_data_sec;
+
+// Functions prototypes
+void list_info(t_boot_entry be);
+
+int read_cluster(FILE *fd, uint8_t *buf, int sec);
+
+void list_dir(uint8_t *recv_buf, int offset, int sec, int level, uint32_t cluster);
+
+void list_long_entry(uint8_t *buf, int size);
+
+uint32_t get_clus_fat_entry_val(uint32_t *clus_fat_entry_val);
+
 #endif // __FAT32_H__
