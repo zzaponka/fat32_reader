@@ -15,9 +15,14 @@ int main(int argc, char **argv)
 	uint16_t num;
 	int lev = 1;
 
+	if (argc < 2) {
+		printf("Usage: main <filename>\n");
+		exit(1);
+	}
+
 	setlocale(LC_ALL, "C.UTF-8");
 
-	fd = fopen("./disk.img", "r");
+	fd = fopen(argv[1], "r");
 	if (!fd) {
 		perror("Failed to open file");
 		exit(1);

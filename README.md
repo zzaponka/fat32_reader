@@ -2,5 +2,5 @@
 
 ## Compilation:
 ```
-gcc -Wall -Werror ./main.c -o ./main
+gcc -Wall -Werror ./fat32reader.c -o ./fat32reader
 ```
