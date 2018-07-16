@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 	}
 	memcpy(&boot_entry, buf, sizeof(t_boot_entry));
 
-	list_info(boot_entry);
+	// list_info(boot_entry);
 	printf("%s@%d: buf->BPB_BytsPerSec = %d.\n", __func__, __LINE__, ((t_boot_entry *)buf)->BPB_BytsPerSec);
 	bytes_per_sec = ((t_boot_entry *)buf)->BPB_BytsPerSec;
 	printf("%s@%d: bytes_per_sec = %d.\n", __func__, __LINE__, bytes_per_sec);

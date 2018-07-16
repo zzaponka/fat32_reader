@@ -120,3 +120,21 @@ Output layout after restart(!)
 - log: file5499.txt
 - data: di_dat_cluster_8_2
 - fat: di_fat_1
+
+Last investigations:
+--------------------
+- it has been found that after a file named file5499.txt, first directory name
+  char value is E5 what should mean empty directory. Can it be put at the final
+  directory entry?
+- after spending some time inside documentation have found that LDIR_Ord field
+  cannot have vales of 0xE5 or 0x00. These values have always been used by the
+  file system indicate a "free" directory entry, or the "last" directory entry
+  in the cluster
+
+Recap:
+- 1) file5499 has been found;
+- 2) E5 entry after it: just free entry. Have added a check;
+
+So, at 1 am I'm doing this:
+---------------------------
+- try to check what cluster we read before pass it to list_dir();
